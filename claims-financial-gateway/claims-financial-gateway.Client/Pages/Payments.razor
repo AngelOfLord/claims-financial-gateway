@@ -1,0 +1,144 @@
+﻿@page "/payments"
+@inject IBatchService _BatchService
+@inject ISnackbar _Snackbar
+
+<PageTitle>Payments</PageTitle>
+<MudText Typo="Typo.h4" Class="mt-5 mb-10">Payments</MudText>
+<MudField Variant="Variant.Outlined" Label="Advanced Search">
+    <MudForm Model="payment" @ref="_searchForm">
+        <MudGrid Spacing="3">
+            <MudItem xs="3">
+                <MudNumericField Label="Claim Transaction Id" @bind-Value="@_claimTransactionId" Immediate HideSpinButtons Variant="Variant.Text" Margin="Margin.Dense"/>
+            </MudItem>
+            <MudItem xs="3">
+                 <MudNumericField Label="Claim Number" @bind-Value="@_claimNumber" Immediate HideSpinButtons Variant="Variant.Text" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="3">
+                 <MudNumericField Label="Payee Id" @bind-Value="@_payeeId" Immediate HideSpinButtons Variant="Variant.Text" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="3">
+                 <MudTextField T="string" Counter="50" Immediate @bind-Value="@_payeeName" MaxLength="50"
+                               Label="Payee Name" Variant="Variant.Text" Margin="Margin.Dense" />
+            </MudItem>
+             <MudItem xs="3">
+                 <MudNumericField Label="Bank Account Id" @bind-Value="@_bankAccountId" Immediate HideSpinButtons Variant="Variant.Text" Margin="Margin.Dense" />
+             </MudItem>
+            <MudItem xs="3">
+                 <MudDateRangePicker PickerVariant="PickerVariant.Inline" Label="Released Date" @bind-DateRange="@_relasedDateRange" Margin="Margin.Dense" MaxDate="DateTime.Now" />
+            </MudItem>
+            <MudItem xs="3">
+                 <MudDateRangePicker PickerVariant="PickerVariant.Inline" Label="Created Date" @bind-DateRange="@_createdDateRange" Margin="Margin.Dense" MaxDate="DateTime.Now" />
+            </MudItem>
+            <MudItem xs="3">
+                 <MudDatePicker PickerVariant="PickerVariant.Inline" Label="Loss Date" @bind-Date="@_lossDate" Margin="Margin.Dense" MaxDate="DateTime.Now" />
+            </MudItem>
+             <MudItem xs="12">
+                 <MudStack Row Spacing="4" Justify="Justify.FlexEnd" >
+                     <MudButton Variant="Variant.Filled" Color="Color.Secondary" ButtonType="ButtonType.Reset" OnClick="@(() => HandleReset())">Reset</MudButton>
+                     <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Button" StartIcon="@Icons.Material.Filled.Search" Disabled="@(!_searchForm.IsValid)" OnClick="@(async () => await HandleSubmit())">Search</MudButton>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+</MudField>
+
+ @if (_payments.Any())
+{
+    <MudDataGrid T="Payment" MultiSelection="true" Items="@_payments" Class="mt-8"
+                 SortMode="SortMode.Single" Filterable="true" QuickFilter="@_quickFilter" Elevation="3">
+        <ToolBarContent>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                          AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.ClaimTransactionId" />
+            <PropertyColumn Property="x => x.Payee" />
+            <PropertyColumn Property="x => x.Address" Sortable="true" />
+            <TemplateColumn Filterable="false" Sortable="false">
+                <CellTemplate>
+                    @if(context.Item.Amount > 1)
+                    {
+                        //TODO: Change to Payment TYpe
+                        <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Primary" Size="Size.Small" OnClick="@(async () => await PrintCheck())"></MudIconButton>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="Payment" PageSizeOptions="@([5, 10, 25, 50])" />
+        </PagerContent>
+    </MudDataGrid>
+}
+else if (_isSubmitted)
+{
+    <MudAlert Severity="Severity.Info" ContentAlignment="HorizontalAlignment.Center" Class="mt-8"> No Results Found </MudAlert>
+}
+
+
+@code {
+    private MudForm _searchForm;
+    private bool _isSubmitted;
+    private Payment payment = new()
+        {
+            Address = "",
+            Payee = "",
+        };
+    private int? _claimTransactionId;
+    private int? _claimNumber;
+    private int? _payeeId;
+    private string? _payeeName;
+    private int? _bankAccountId;
+    private DateRange? _relasedDateRange;
+    private DateRange? _createdDateRange;
+    private DateTime? _lossDate;
+
+    private IList<Payment> _payments = [];
+    private string? _searchString;
+
+    private async Task HandleSubmit()
+    {
+        //await _searchForm.Validate();
+        if (_searchForm.IsValid)
+        {
+            _isSubmitted = true;
+            for (var i = 0; i < 100; i++)
+            {
+                _payments.Add((await _BatchService.GetPaymentsAsync()).First());
+                _payments = _payments.Where(x => x.ClaimTransactionId == _claimTransactionId).ToList();
+            }
+        }
+    }
+
+    private void HandleReset()
+    {
+        _searchForm.ResetValidation();
+        _isSubmitted = false;
+    }
+
+    private Func<Payment, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.ClaimTransactionId.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.Payee.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.Address.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+    }
+
+    private async Task PrintCheck()
+    {
+        _Snackbar.Add("Check have been sent to the print queue", Severity.Success, cfg => cfg.DuplicatesBehavior = SnackbarDuplicatesBehavior.Allow);
+    }
+}

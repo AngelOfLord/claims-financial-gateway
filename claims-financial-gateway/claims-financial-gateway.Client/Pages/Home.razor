@@ -1,0 +1,79 @@
+﻿@page "/"
+@inject IBatchService _BatchService
+@inject NavigationManager _NavManager
+
+<PageTitle>Home</PageTitle>
+<MudText Typo="Typo.h4" Class="mt-5 mb-10">Batch Summary</MudText>
+
+<MudDataGrid Items="@Batches" Filterable="true" SortMode="@SortMode.Single" Elevation="3">
+    <Columns>
+        <PropertyColumn Property="x => x.RunDate.ToShortDateString()"></PropertyColumn>
+        <TemplateColumn Title="Bank">
+            <CellTemplate>
+                <MudInputLabel><strong>@context.Item.BankName</strong></MudInputLabel>
+                <MudInputLabel>@context.Item.BankDescription</MudInputLabel>
+                <MudInputLabel>@context.Item.BankAccountNumber</MudInputLabel>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Payment Summary" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    @if(context.Item.Check is not null)
+                    {
+                        <MudPaper Class="pa-3 ma-2" Elevation="3">
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                 <MudChip Color="Color.Primary" OnClick="@(() => _NavManager.NavigateTo($"/check-details/{context.Item.Id}", false))">Check</MudChip>
+                                 <MudStack>
+                                     <MudInputLabel><strong>Payments:</strong> @context.Item.Check.TotalAmount</MudInputLabel>
+                                        <MudInputLabel><strong>Amount:</strong> @context.Item.Check.TotalPayments.ToString("C")</MudInputLabel>
+                                    </MudStack>
+                                </MudStack>
+                        </MudPaper>
+                    }
+                    @if(context.Item.Check is not null && context.Item.ACH is not null)
+                    {
+                        <MudDivider Vertical="true" FlexItem="true" />
+                    }
+                    @if (context.Item.ACH is not null)
+                    {
+                        <MudPaper Class="pa-3 ma-2" Elevation="3">
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                 <MudChip Color="Color.Primary" OnClick="@(() => _NavManager.NavigateTo($"/ach-details/{context.Item.Id}", false))">ACH</MudChip>
+                                 <MudStack>
+                                     <MudInputLabel><strong>Payments:</strong> @context.Item.ACH.TotalPayments</MudInputLabel>
+                                        <MudInputLabel><strong>Amount:</strong> @context.Item.ACH.TotalAmount.ToString("C")</MudInputLabel>
+                                    </MudStack>
+                                </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Status" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudChip Color="@GetColor(@context.Item.Status)">@context.Item.Status</MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+ @code {
+    public required IList<Batch> Batches { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Batches = await _BatchService.GetBatchesAsync();
+    }
+
+    protected Color GetColor(Batch.BatchStatus status)
+    {
+        //TODO: Add Stuff
+        return status switch
+        {
+            Batch.BatchStatus.Initilized => Color.Info,
+            Batch.BatchStatus.Completed => Color.Success,
+            Batch.BatchStatus.Errored => Color.Error,
+            _ => Color.Default
+        };
+    }
+}
